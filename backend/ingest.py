@@ -58,6 +58,16 @@ def ingest():
 
     client = chromadb.PersistentClient(path=CHROMA_PERSIST_PATH)
 
+    # Skip if collection already has data (e.g. on restart with persistent disk)
+    try:
+        existing = client.get_collection(COLLECTION_NAME)
+        count = existing.count()
+        if count > 0:
+            print(f"Collection '{COLLECTION_NAME}' already has {count} chunks — skipping ingest.")
+            return
+    except Exception:
+        pass  # Collection doesn't exist yet — proceed with ingest
+
     # Delete existing collection so we get a clean ingest
     try:
         client.delete_collection(COLLECTION_NAME)

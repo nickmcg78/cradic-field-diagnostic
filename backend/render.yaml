@@ -2,8 +2,8 @@ services:
   - type: web
     name: cradic-field-diagnostic-api
     env: python
-    buildCommand: pip install -r requirements.txt && python ingest.py
-    startCommand: gunicorn app:app
+    buildCommand: pip install -r requirements.txt
+    startCommand: python ingest.py & gunicorn app:app --timeout 120 --workers 1
     disk:
       name: chroma-storage
       mountPath: /data/chroma_db

@@ -52,10 +52,17 @@ def _get_collection():
             model_name="all-MiniLM-L6-v2"
         )
         _client = chromadb.PersistentClient(path=CHROMA_PERSIST_PATH)
-        _collection = _client.get_collection(
-            name=COLLECTION_NAME,
-            embedding_function=ef,
-        )
+        try:
+            _collection = _client.get_collection(
+                name=COLLECTION_NAME,
+                embedding_function=ef,
+            )
+        except Exception:
+            # Collection not ready yet (ingest still running)
+            raise RuntimeError(
+                "Knowledge base is still loading — this takes about 10 minutes on first startup. "
+                "Please try again shortly."
+            )
     return _collection
 
 
