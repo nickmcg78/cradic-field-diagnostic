@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import Login from "./components/Login";
+import ContextScreen from "./components/ContextScreen";
 import Chat from "./components/Chat";
 
 export default function App() {
   const [authToken, setAuthToken] = useState(null);
+  const [sessionContext, setSessionContext] = useState(null);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("auth_token");
@@ -16,9 +18,17 @@ export default function App() {
     setAuthToken(token);
   }
 
+  function handleStart({ machine, customer }) {
+    setSessionContext({ machine, customer });
+  }
+
   if (!authToken) {
     return <Login onLogin={handleLogin} />;
   }
 
-  return <Chat authToken={authToken} />;
+  if (!sessionContext) {
+    return <ContextScreen onStart={handleStart} />;
+  }
+
+  return <Chat authToken={authToken} sessionContext={sessionContext} />;
 }

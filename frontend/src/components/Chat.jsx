@@ -4,7 +4,14 @@ import "./Chat.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-export default function Chat({ authToken }) {
+function buildContextPrefix({ machine, customer }) {
+  if (customer) {
+    return `[Context: Machine = ${machine}, Customer = ${customer} — reference this customer's service history where relevant but do not exclude other sources] `;
+  }
+  return `[Context: Machine = ${machine}] `;
+}
+
+export default function Chat({ authToken, sessionContext }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,6 +30,8 @@ export default function Chat({ authToken }) {
     setError("");
 
     const userMsg = { role: "user", text: question, timestamp: Date.now() };
+    const contextPrefix = sessionContext ? buildContextPrefix(sessionContext) : "";
+    const queryWithContext = contextPrefix + question;
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
 
@@ -33,7 +42,7 @@ export default function Chat({ authToken }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question: queryWithContext }),
       });
 
       const data = await res.json();
