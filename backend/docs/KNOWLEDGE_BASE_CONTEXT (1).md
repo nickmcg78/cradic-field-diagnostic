@@ -288,6 +288,7 @@ The following documents are ingested in this knowledge base:
 | Document | Description |
 |---|---|
 | User_Trave_340.pdf | G. Mondini Trave 340 VG User and Maintenance Manual (2022, S/N A/22/A-12984) |
+| User_Trave_590.pdf | G. Mondini Trave 590 User and Maintenance Manual |
 
 ### Select Equip Service Reports
 | Document | SR # | Customer | Date | Machine |
