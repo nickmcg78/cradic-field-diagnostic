@@ -49,9 +49,7 @@ _claude = None
 def _get_collection():
     global _client, _collection
     if _collection is None:
-        ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
+        ef = embedding_functions.DefaultEmbeddingFunction()
         _client = chromadb.PersistentClient(path=CHROMA_PERSIST_PATH)
         try:
             _collection = _client.get_collection(

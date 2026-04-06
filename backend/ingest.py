@@ -76,9 +76,7 @@ def ingest():
     except Exception:
         pass
 
-    ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="all-MiniLM-L6-v2"
-    )
+    ef = embedding_functions.DefaultEmbeddingFunction()
     collection = client.get_or_create_collection(
         name=COLLECTION_NAME,
         embedding_function=ef,

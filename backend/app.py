@@ -8,6 +8,14 @@ load_dotenv(Path(__file__).parent / ".env", override=True)
 
 from query import get_answer  # noqa: E402 — import after env load
 
+# Pre-warm ONNX embedding model at startup so first query isn't slow
+try:
+    from chromadb.utils import embedding_functions as _ef
+    _ef.DefaultEmbeddingFunction()(["warmup"])
+    print("Embedding model ready.")
+except Exception as _e:
+    print(f"Embedding warmup skipped: {_e}")
+
 app = Flask(__name__)
 CORS(app)
 
