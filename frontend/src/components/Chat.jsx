@@ -72,8 +72,8 @@ export default function Chat({ authToken, sessionContext }) {
       <header className="chat-header">
         <span className="chat-header-icon">⚙</span>
         <div>
-          <h1 className="chat-header-title">Cradic AI</h1>
-          <p className="chat-header-sub">Field Diagnostic Tool</p>
+          <h1 className="chat-header-title">Select Equip</h1>
+          <p className="chat-header-sub">powered by Cradic AI</p>
         </div>
       </header>
 

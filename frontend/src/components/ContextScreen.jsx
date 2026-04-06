@@ -44,8 +44,8 @@ export default function ContextScreen({ onStart }) {
       <header className="ctx-header">
         <span className="ctx-header-icon">⚙</span>
         <div>
-          <h1 className="ctx-header-title">Cradic AI</h1>
-          <p className="ctx-header-sub">Field Diagnostic Tool</p>
+          <h1 className="ctx-header-title">Select Equip</h1>
+          <p className="ctx-header-sub">powered by Cradic AI</p>
         </div>
       </header>
 
