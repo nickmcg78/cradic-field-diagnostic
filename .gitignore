@@ -14,8 +14,8 @@ venv/
 .env
 backend/.env
 
-# ChromaDB (built during deploy)
-backend/chroma_db/
+# ChromaDB pre-built and committed via Git LFS (chroma.sqlite3)
+# backend/chroma_db/
 
 # Node
 node_modules/

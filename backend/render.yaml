@@ -3,15 +3,9 @@ services:
     name: cradic-field-diagnostic-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python ingest.py & gunicorn app:app --timeout 120 --workers 1
-    disk:
-      name: chroma-storage
-      mountPath: /data/chroma_db
-      sizeGB: 1
+    startCommand: gunicorn app:app --timeout 120 --workers 1
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: APP_PASSWORD
         sync: false
-      - key: CHROMA_PERSIST_PATH
-        value: /data/chroma_db
