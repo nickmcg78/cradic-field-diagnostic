@@ -111,7 +111,7 @@ Machines on site:
 This is a high-activity service site. The Trave 1200 (A16A-11326) has a documented history of vacuum leak and belt contamination issues across multiple callouts (SR #5789, #5843, #5937).
 
 ### Ausfresh — Broadmeadows, VIC
-**Address:** 91-93 Riggall St, Broadmeadows VIC 3047  
+**Address:** 91-93 Riggall St, Broadmeadows VIC 3047
 **Site contact:** Frank
 
 Machines on site:
@@ -124,6 +124,33 @@ Machines on site:
 | Trave 384 | A23B12248 | Line 4 |
 | Trave 367 | A16A11498 | Line 5 |
 | Trave 367 | A14A00995 | Line 6 |
+
+### Lite n Easy — Multiple locations (also referred to as LnE, Liteneasy)
+Multiple sites across Australia including a Western Australia location. Active service customer with documented callouts across multiple lines and years.
+
+### Bindaree Food Group — Burleigh Heads, QLD
+Beef processing facility. Service history includes multiple callouts and uptime support visits.
+
+### Baiada — Hanwood, NSW
+Poultry processing facility. Multiple machines on site across several production lines. Significant callout and uptime support history.
+
+### Baiada — Beresfield, NSW
+Second Baiada facility. Service history includes tooling commissioning, sealing issues, and breakdown callouts.
+
+### Hilton Foods — QLD
+Food manufacturing site in Queensland. High volume of service reports including production support, PLC issues, lifting unit faults, and magazine issues across multiple lines.
+
+### Coles / RROA
+Retail Ready Open Architecture (RROA) tray sealing line. Multiple service reports covering platformer, tooling, sealbars, and film trials.
+
+### MQF
+Active service customer. Callouts documented across multiple lines including line 2, 7, and R&D machine.
+
+### DBC (Tassal DeCosti)
+See Tassal DeCosti entry above. DBC is an alternate reference used in some service reports for this customer.
+
+### Huon — Tasmania
+Salmon farming and processing operation. Service history includes at least one documented site visit (Nov 2021).
 
 ---
 

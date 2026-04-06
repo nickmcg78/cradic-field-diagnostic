@@ -1,7 +1,19 @@
 import { useState } from "react";
 import "./ContextScreen.css";
 
-const CUSTOMERS = ["Tassal DeCosti", "Ausfresh"];
+const CUSTOMERS = [
+  "Tassal DeCosti",
+  "Ausfresh",
+  "Lite n Easy",
+  "Bindaree Food Group",
+  "Baiada Hanwood",
+  "Baiada Beresfield",
+  "Hilton Foods",
+  "Coles",
+  "RROA",
+  "MQF",
+  "Huon Tasmania",
+];
 const MACHINES = ["Trave 340", "Trave 590"];
 
 function fuzzyMatch(input) {
