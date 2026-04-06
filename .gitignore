@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Secrets
+.env
+backend/.env
+
+# ChromaDB (built during deploy)
+backend/chroma_db/
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# Vite build output
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db

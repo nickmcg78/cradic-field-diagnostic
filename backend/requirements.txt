@@ -1,0 +1,10 @@
+flask
+flask-cors
+chromadb
+sentence-transformers
+anthropic
+pypdf
+python-docx
+python-dotenv
+gunicorn
+cryptography

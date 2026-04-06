@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: cradic-field-diagnostic-api
+    env: python
+    buildCommand: pip install -r requirements.txt && python ingest.py
+    startCommand: gunicorn app:app
+    disk:
+      name: chroma-storage
+      mountPath: /data/chroma_db
+      sizeGB: 1
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: CHROMA_PERSIST_PATH
+        value: /data/chroma_db
