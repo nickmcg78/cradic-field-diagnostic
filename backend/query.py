@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env", override=True)
 
-CHROMA_PERSIST_PATH = os.environ.get("CHROMA_PERSIST_PATH", "./chroma_db")
+_DEFAULT_CHROMA_PATH = str(Path(__file__).parent / "chroma_db")
+CHROMA_PERSIST_PATH = os.environ.get("CHROMA_PERSIST_PATH", _DEFAULT_CHROMA_PATH)
 COLLECTION_NAME = "select_equip_kb"
 TOP_K = 8
 
