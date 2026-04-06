@@ -8,7 +8,15 @@ load_dotenv(Path(__file__).parent / ".env", override=True)
 
 from query import get_answer  # noqa: E402 — import after env load
 
-# Pre-warm ONNX embedding model at startup so first query isn't slow
+# Point ONNX model to bundled copy in repo — no network download needed at runtime
+from pathlib import Path as _Path
+try:
+    from chromadb.utils.embedding_functions.onnx_mini_lm_l6_v2 import ONNXMiniLM_L6_V2 as _ONNX
+    _ONNX.DOWNLOAD_PATH = _Path(__file__).parent / "onnx_models" / "all-MiniLM-L6-v2"
+except Exception:
+    pass
+
+# Pre-warm ONNX embedding model at startup so first query is instant
 try:
     from chromadb.utils import embedding_functions as _ef
     _ef.DefaultEmbeddingFunction()(["warmup"])

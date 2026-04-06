@@ -5,6 +5,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Point ONNX model to bundled copy in repo — no network download needed at runtime
+_ONNX_PATH = Path(__file__).parent / "onnx_models" / "all-MiniLM-L6-v2"
+try:
+    from chromadb.utils.embedding_functions.onnx_mini_lm_l6_v2 import ONNXMiniLM_L6_V2
+    ONNXMiniLM_L6_V2.DOWNLOAD_PATH = _ONNX_PATH
+except Exception:
+    pass
+
 _DEFAULT_CHROMA_PATH = str(Path(__file__).parent / "chroma_db")
 CHROMA_PERSIST_PATH = os.environ.get("CHROMA_PERSIST_PATH", _DEFAULT_CHROMA_PATH)
 DOCS_DIR = Path(__file__).parent / "docs"
