@@ -119,8 +119,6 @@ def get_answer(question: str) -> str:
 
     # Secondary retrieval — image_description chunks from the same source files
     source_files = list(source_rank.keys())
-    print(f"[DEBUG] source_files for $in filter ({len(source_files)}): {source_files}")
-    print(f"[DEBUG] source_rank: {source_rank}")
     if source_files:
         try:
             img_results = collection.get(
@@ -130,8 +128,6 @@ def get_answer(question: str) -> str:
                 ]},
                 include=["documents", "metadatas"],
             )
-            print(f"[DEBUG] secondary query returned {len(img_results['ids'])} image chunks: {img_results['ids']}")
-
             # Filter out duplicates and logos, collect candidates
             img_candidates = []
             for img_id, img_doc, img_meta in zip(
@@ -156,20 +152,11 @@ def get_answer(question: str) -> str:
                     continue
                 seen_ids.add(img_id)
                 combined.append((img_id, img_doc, img_meta))
-        except Exception as e:
-            print(f"[DEBUG] secondary image query EXCEPTION: {type(e).__name__}: {e}")
-            import traceback; traceback.print_exc()
+        except Exception:
+            pass  # Don't fail the query if image lookup fails
 
     # Cap at MAX_CONTEXT_CHUNKS
     combined = combined[:MAX_CONTEXT_CHUNKS]
-
-    # Debug log — show what's being sent to Claude
-    print(f"\n=== Query context: {len(combined)} chunks ===")
-    for chunk_id, doc, meta in combined:
-        doc_type = meta.get("doc_type", "text")
-        preview = doc[:80].replace("\n", " ")
-        print(f"  {chunk_id} [{doc_type}] {preview}...")
-    print()
 
     # Build context blocks
     context_blocks = []
