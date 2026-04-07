@@ -6,5 +6,7 @@ anthropic
 pypdf
 python-docx
 python-dotenv
+PyMuPDF
+Pillow
 gunicorn
 cryptography
