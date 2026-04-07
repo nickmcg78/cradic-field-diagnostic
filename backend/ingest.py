@@ -21,7 +21,7 @@ DOCS_DIR = Path(__file__).parent / "docs"
 COLLECTION_NAME = "select_equip_kb"
 CHUNK_SIZE = 500      # tokens (approx words)
 CHUNK_OVERLAP = 50
-MIN_IMAGE_BYTES = 5 * 1024  # 5KB — skip logos / decorative elements
+MIN_IMAGE_BYTES = 15 * 1024  # 15KB — skip logos / decorative elements
 
 # Files to SKIP for image extraction (manuals, Lenze/B&R drive docs)
 _SKIP_IMAGE_EXTRACTION = {

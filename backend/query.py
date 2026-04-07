@@ -18,7 +18,10 @@ except Exception:
 _DEFAULT_CHROMA_PATH = str(Path(__file__).parent / "chroma_db")
 CHROMA_PERSIST_PATH = os.environ.get("CHROMA_PERSIST_PATH", _DEFAULT_CHROMA_PATH)
 COLLECTION_NAME = "select_equip_kb"
-TOP_K = 8
+TOP_K = 15
+MAX_CONTEXT_CHUNKS = 20
+MAX_IMAGES_PER_FILE = 5
+_LOGO_FILTERS = ["uptimeequip", "selectequip logo", "logo and tagline"]
 
 SYSTEM_PROMPT = """You are the Cradic AI Field Diagnostic Assistant, built for Select Equip field service technicians servicing G. Mondini tray sealer machines on factory floors in Australia.
 
@@ -46,6 +49,9 @@ When referencing the Mondini manual, always format page references as a clickabl
 - For Trave 340: [Trave 340 Manual p.{page}](https://cradic-field-diagnostic.vercel.app/manuals/User Trave 340.pdf#page={page})
 - For Trave 590: [Trave 590 Manual p.{page}](https://cradic-field-diagnostic.vercel.app/manuals/User Trave 590.pdf#page={page})
 Always include the page number link when citing the manual. If you don't know the exact page, link to page 1.
+
+PHOTO EVIDENCE:
+When the context includes chunks prefixed with 📷 PHOTO EVIDENCE:, explicitly reference them in your response under a section called 📷 Photo Evidence from Job. Describe what the photos show and how it relates to the fault or procedure.
 
 HARD RULES:
 - Do not guess fault causes without citing a source.
@@ -89,6 +95,7 @@ def _get_claude():
 def get_answer(question: str) -> str:
     collection = _get_collection()
 
+    # Primary retrieval — top 15 chunks by similarity
     results = collection.query(
         query_texts=[question],
         n_results=TOP_K,
@@ -97,14 +104,81 @@ def get_answer(question: str) -> str:
 
     docs = results["documents"][0]
     metas = results["metadatas"][0]
+    ids = results["ids"][0]
+
+    # Collect into a deduplicated list of (id, doc, meta)
+    seen_ids = set(ids)
+    combined = list(zip(ids, docs, metas))
+
+    # Build rank map: source_file → best (lowest) position in primary results
+    source_rank = {}
+    for pos, m in enumerate(metas):
+        sf = m.get("source_file")
+        if sf and sf not in source_rank:
+            source_rank[sf] = pos
+
+    # Secondary retrieval — image_description chunks from the same source files
+    source_files = list(source_rank.keys())
+    print(f"[DEBUG] source_files for $in filter ({len(source_files)}): {source_files}")
+    print(f"[DEBUG] source_rank: {source_rank}")
+    if source_files:
+        try:
+            img_results = collection.get(
+                where={"$and": [
+                    {"doc_type": {"$eq": "image_description"}},
+                    {"source_file": {"$in": source_files}},
+                ]},
+                include=["documents", "metadatas"],
+            )
+            print(f"[DEBUG] secondary query returned {len(img_results['ids'])} image chunks: {img_results['ids']}")
+
+            # Filter out duplicates and logos, collect candidates
+            img_candidates = []
+            for img_id, img_doc, img_meta in zip(
+                img_results["ids"], img_results["documents"], img_results["metadatas"]
+            ):
+                if img_id in seen_ids:
+                    continue
+                doc_lower = img_doc.lower()
+                if any(logo in doc_lower for logo in _LOGO_FILTERS):
+                    continue
+                img_candidates.append((img_id, img_doc, img_meta))
+
+            # Sort by source_file rank (images from highest-ranked file first)
+            img_candidates.sort(key=lambda x: source_rank.get(x[2].get("source_file", ""), 999))
+
+            # Apply per-file cap and add to combined
+            img_count_per_file = {}
+            for img_id, img_doc, img_meta in img_candidates:
+                sf = img_meta.get("source_file", "")
+                img_count_per_file[sf] = img_count_per_file.get(sf, 0) + 1
+                if img_count_per_file[sf] > MAX_IMAGES_PER_FILE:
+                    continue
+                seen_ids.add(img_id)
+                combined.append((img_id, img_doc, img_meta))
+        except Exception as e:
+            print(f"[DEBUG] secondary image query EXCEPTION: {type(e).__name__}: {e}")
+            import traceback; traceback.print_exc()
+
+    # Cap at MAX_CONTEXT_CHUNKS
+    combined = combined[:MAX_CONTEXT_CHUNKS]
+
+    # Debug log — show what's being sent to Claude
+    print(f"\n=== Query context: {len(combined)} chunks ===")
+    for chunk_id, doc, meta in combined:
+        doc_type = meta.get("doc_type", "text")
+        preview = doc[:80].replace("\n", " ")
+        print(f"  {chunk_id} [{doc_type}] {preview}...")
+    print()
 
     # Build context blocks
     context_blocks = []
-    for i, (doc, meta) in enumerate(zip(docs, metas), start=1):
+    for i, (chunk_id, doc, meta) in enumerate(combined, start=1):
         source = meta.get("source_file", "unknown")
         page = meta.get("page_number")
         ref = f"{source}, page {page}" if page else source
-        context_blocks.append(f"[{i}] Source: {ref}\n{doc}")
+        prefix = "\U0001f4f7 PHOTO EVIDENCE: " if meta.get("doc_type") == "image_description" else ""
+        context_blocks.append(f"[{i}] Source: {ref}\n{prefix}{doc}")
 
     context_text = "\n\n---\n\n".join(context_blocks)
 
