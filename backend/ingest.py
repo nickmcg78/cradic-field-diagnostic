@@ -1,9 +1,14 @@
 import os
 import re
 import io
+import sys
 import base64
 from pathlib import Path
 from dotenv import load_dotenv
+
+# Ensure stdout handles Unicode on all platforms (avoids charmap errors on Windows)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 load_dotenv(Path(__file__).parent / ".env", override=True)
 
@@ -19,6 +24,11 @@ _DEFAULT_CHROMA_PATH = str(Path(__file__).parent / "chroma_db")
 CHROMA_PERSIST_PATH = os.environ.get("CHROMA_PERSIST_PATH", _DEFAULT_CHROMA_PATH)
 DOCS_DIR = Path(__file__).parent / "docs"
 COLLECTION_NAME = "select_equip_kb"
+
+# Pinecone config
+PINECONE_INDEX_NAME = "cradic-field-diagnostic"
+PINECONE_REGION = "us-east-1"
+PINECONE_CLOUD = "aws"
 CHUNK_SIZE = 500      # tokens (approx words)
 CHUNK_OVERLAP = 50
 MIN_IMAGE_BYTES = 15 * 1024  # 15KB — skip logos / decorative elements
@@ -156,35 +166,71 @@ def ingest():
     import chromadb
     from chromadb.utils import embedding_functions
 
-    client = chromadb.PersistentClient(path=CHROMA_PERSIST_PATH)
+    ef = embedding_functions.DefaultEmbeddingFunction()
 
-    # Skip if collection already has data (e.g. on restart with persistent disk)
+    # -------------------------------------------------------------------------
+    # ChromaDB path — skip if collection already populated
+    # -------------------------------------------------------------------------
+    client = chromadb.PersistentClient(path=CHROMA_PERSIST_PATH)
+    run_chroma = True
     try:
         existing = client.get_collection(COLLECTION_NAME)
         count = existing.count()
         if count > 0:
-            print(f"Collection '{COLLECTION_NAME}' already has {count} chunks — skipping ingest.")
-            return
+            print(f"ChromaDB: '{COLLECTION_NAME}' already has {count} chunks — skipping.")
+            run_chroma = False
     except Exception:
-        pass  # Collection doesn't exist yet — proceed with ingest
+        pass  # Collection doesn't exist yet — proceed
 
-    # Delete existing collection so we get a clean ingest
-    try:
-        client.delete_collection(COLLECTION_NAME)
-        print(f"Deleted existing collection '{COLLECTION_NAME}'")
-    except Exception:
-        pass
+    if run_chroma:
+        try:
+            client.delete_collection(COLLECTION_NAME)
+            print(f"ChromaDB: deleted existing collection '{COLLECTION_NAME}'")
+        except Exception:
+            pass
 
-    ef = embedding_functions.DefaultEmbeddingFunction()
-    collection = client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        embedding_function=ef,
-        metadata={"hnsw:space": "cosine"},
-    )
+    chroma_collection = None
+    if run_chroma:
+        chroma_collection = client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            embedding_function=ef,
+            metadata={"hnsw:space": "cosine"},
+        )
 
+    # -------------------------------------------------------------------------
+    # Pinecone path — skip if index already populated (unless FORCE_INGEST=1)
+    # -------------------------------------------------------------------------
+    pinecone_index = None
+    run_pinecone = False
+    pinecone_api_key = os.environ.get("PINECONE_API_KEY")
+    if pinecone_api_key:
+        try:
+            from pinecone import Pinecone
+            pc = Pinecone(api_key=pinecone_api_key)
+            pinecone_index = pc.Index(PINECONE_INDEX_NAME)
+            stats = pinecone_index.describe_index_stats()
+            existing_vectors = stats.total_vector_count
+            if existing_vectors > 0 and not os.environ.get("FORCE_INGEST"):
+                print(f"Pinecone: '{PINECONE_INDEX_NAME}' already has {existing_vectors} vectors — skipping.")
+                print("  Set FORCE_INGEST=1 to re-ingest.")
+            else:
+                run_pinecone = True
+                if existing_vectors > 0:
+                    print(f"Pinecone: FORCE_INGEST set — deleting {existing_vectors} existing vectors...")
+                    pinecone_index.delete(delete_all=True)
+                print(f"Pinecone: will ingest to '{PINECONE_INDEX_NAME}' ({PINECONE_CLOUD}/{PINECONE_REGION})")
+        except Exception as e:
+            print(f"Pinecone init failed: {e}")
+
+    if not run_chroma and not run_pinecone:
+        print("Nothing to ingest. Set FORCE_INGEST=1 to re-ingest to Pinecone.")
+        return
+
+    # -------------------------------------------------------------------------
+    # Shared ingest loop
+    # -------------------------------------------------------------------------
     all_files = list(DOCS_DIR.iterdir())
 
-    # Sort so KNOWLEDGE_BASE_CONTEXT.md is first
     def sort_key(p: Path):
         if p.name == "KNOWLEDGE_BASE_CONTEXT.md":
             return (0, p.name)
@@ -205,9 +251,35 @@ def ingest():
 
     def flush_batch():
         nonlocal ids, documents, metadatas
-        if documents:
-            collection.add(ids=ids, documents=documents, metadatas=metadatas)
-            ids, documents, metadatas = [], [], []
+        if not documents:
+            return
+
+        # Compute embeddings once — used by both ChromaDB and Pinecone
+        embeddings = ef(documents)
+
+        if run_chroma and chroma_collection is not None:
+            chroma_collection.add(
+                ids=ids,
+                embeddings=embeddings,
+                documents=documents,
+                metadatas=metadatas,
+            )
+
+        if run_pinecone and pinecone_index is not None:
+            vectors = []
+            for vid, vec, meta, doc in zip(ids, embeddings, metadatas, documents):
+                # Pinecone metadata: strip None values, store text for retrieval
+                clean_meta = {k: v for k, v in meta.items() if v is not None}
+                clean_meta["chunk_index"] = str(clean_meta.get("chunk_index", ""))
+                clean_meta["text"] = doc
+                vectors.append({"id": vid, "values": vec.tolist(), "metadata": clean_meta})
+            # Upsert in sub-batches of 100 (Pinecone limit)
+            for i in range(0, len(vectors), 100):
+                pinecone_index.upsert(vectors=vectors[i:i + 100])
+
+        ids.clear()
+        documents.clear()
+        metadatas.clear()
 
     for file_path in all_files:
         suffix = file_path.suffix.lower()
@@ -252,7 +324,6 @@ def ingest():
                         if img_list:
                             if vision_client is None:
                                 vision_client = _get_vision_client()
-                            # Track images per page for numbering
                             page_img_counter = {}
                             for png_bytes, page_num in img_list:
                                 page_img_counter[page_num] = page_img_counter.get(page_num, 0) + 1

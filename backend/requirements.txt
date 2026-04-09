@@ -10,3 +10,4 @@ PyMuPDF
 Pillow
 gunicorn
 cryptography
+pinecone
