@@ -16,7 +16,20 @@ export default function Chat({ authToken, sessionContext }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notes, setNotes] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
   const bottomRef = useRef(null);
+
+  async function copyNotes() {
+    if (!notes) return;
+    try {
+      await navigator.clipboard.writeText(notes);
+      setCopyStatus("Copied");
+    } catch {
+      setCopyStatus("Copy failed");
+    }
+    setTimeout(() => setCopyStatus(""), 1500);
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -113,6 +126,29 @@ export default function Chat({ authToken, sessionContext }) {
         >
           Send
         </button>
+      </div>
+
+      <div className="session-notes">
+        <div className="session-notes-header">
+          <label htmlFor="session-notes-input" className="session-notes-label">
+            Session Notes
+          </label>
+          <button
+            className="session-notes-copy-btn"
+            onClick={copyNotes}
+            disabled={!notes}
+          >
+            {copyStatus || "Copy Notes"}
+          </button>
+        </div>
+        <textarea
+          id="session-notes-input"
+          className="session-notes-input"
+          placeholder="Jot down observations, parts, next steps..."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+        />
       </div>
     </div>
   );
