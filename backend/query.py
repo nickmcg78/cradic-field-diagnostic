@@ -5,6 +5,8 @@ import chromadb
 from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 
+from model_config import ANSWER_MODEL
+
 load_dotenv(Path(__file__).parent / ".env", override=True)
 
 # Point ONNX model to bundled copy in repo — no network download needed at runtime
@@ -135,7 +137,7 @@ TECHNICIAN QUESTION: {question}"""
 
     claude = _get_claude()
     message = claude.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=ANSWER_MODEL,
         max_tokens=2048,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
