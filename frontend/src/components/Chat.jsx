@@ -55,7 +55,10 @@ export default function Chat({ authToken, sessionContext }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ question: queryWithContext }),
+        body: JSON.stringify({
+          question: queryWithContext,
+          machine: sessionContext?.machine || null,
+        }),
       });
 
       const data = await res.json();

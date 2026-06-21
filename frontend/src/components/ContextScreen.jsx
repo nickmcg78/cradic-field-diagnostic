@@ -14,7 +14,15 @@ const CUSTOMERS = [
   "MQF",
   "Huon Tasmania",
 ];
-const MACHINES = ["Trave 340", "Trave 590"];
+const MACHINES = [
+  "Trave 340",
+  "Trave 350",
+  "Trave 367",
+  "Trave 590",
+  "Trave 1000",
+  "Trave 1200",
+  "Trave 1400",
+];
 
 function fuzzyMatch(input) {
   if (!input.trim()) return null;

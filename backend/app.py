@@ -56,8 +56,12 @@ def handle_query():
     if not question:
         return jsonify({"error": "Question cannot be empty"}), 400
 
+    # Optional structured machine scope (e.g. "Trave 590") — drives strict
+    # retrieval filtering in query.py.
+    machine = (data.get("machine") or "").strip() or None
+
     try:
-        answer = get_answer(question)
+        answer = get_answer(question, machine)
         return jsonify({"answer": answer})
     except Exception as e:
         import traceback
