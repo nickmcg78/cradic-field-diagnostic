@@ -27,3 +27,8 @@ frontend/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Service report corpus — lives in SharePoint, not git (3.9 GB, ~8.9k PDFs)
+backend/docs/
+# Chroma DB build artefact — exceeds GitHub 100 MB file limit; do not commit updates
+backend/chroma_db/
