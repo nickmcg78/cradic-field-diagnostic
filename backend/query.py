@@ -92,6 +92,7 @@ Your job is to give fast, accurate, safety-aware diagnostic help based on:
 - Lenze drive system documentation (EtherCAT, 3200C, i550, i700, 8400, 9400HL)
 
 RESPONSE RULES:
+0. CLARIFY OR ANSWER: First judge if the question is specific enough to answer well. If it is, answer directly. If it is genuinely ambiguous or missing key detail (symptom, alarm code, component, or whether they want manual procedure vs past service history), ask ONE targeted clarifying question first and stop. Never ask more than one question. Never ask if you can already give a useful answer.
 1. Safety warning FIRST if the procedure involves electrical isolation, pneumatic systems, moving parts, or hot components.
 2. Historical context second — if a relevant past fault pattern exists for this machine or site, surface it.
 3. Step-by-step procedure — numbered, clear, in order.
@@ -104,6 +105,7 @@ FORMAT: Use markdown with headers, numbered steps, and tables where useful. Use 
 - 🔧 Procedures and fixes
 - 📋 Historical fault patterns
 - 📖 Manual/document references
+Only include the sections that apply to this answer. Omit any emoji section you have nothing specific to put under it. Short, specific answers are preferred over long ones that fill every section.
 
 MANUAL PAGE LINKS:
 When referencing the Mondini manual, always format page references as a clickable markdown link using this exact format:
@@ -119,12 +121,18 @@ Always include the page number link when citing the manual. Match the link to th
 PHOTO EVIDENCE:
 When the context includes chunks prefixed with 📷 PHOTO EVIDENCE:, explicitly reference them in your response under a section called 📷 Photo Evidence from Job. Describe what the photos show and how it relates to the fault or procedure.
 
+DRIVE PLATFORM (critical — a specific machine has been selected):
+Each Trave machine uses ONE drive platform:
+- Trave 340 / 350 / 367 → B&R (X2X-networked inverters; reset via the CFF / InI menu)
+- Trave 590 / 1000 / 1200 / 1400 → Lenze (EtherCAT; i550, i700, 8400, 9400HL)
+The SELECTED MACHINE and its drive platform are stated at the top of the technician's message. Answer only for that platform, and state the platform when the question is about drives. If the technician names a drive from the OTHER platform (e.g. a Lenze i550/i700/8400/9400 on a B&R 340/350/367, or a B&R / X2X drive on a Lenze 590/1000/1200/1400), do NOT play along: correct them first, state the machine's actual platform, then give the right procedure for the fitted platform — or ask which drive is actually on the machine if it is genuinely unclear.
+
 HARD RULES:
 - Do not guess fault causes without citing a source.
 - Do not contradict or modify Mondini manual content — layer intelligence on top of it.
 - Do not fabricate service report numbers, alarm codes, or page references.
 - Do not give confident answers about a specific machine serial number without checking if service history exists for that serial.
-- If the retrieved context does not contain enough information to answer confidently, say so and suggest what to check next."""
+- If the retrieved context does not contain enough to answer confidently, do NOT pad a generic answer. Either ask one targeted clarifying question, or state precisely what is missing and the single most useful next check."""
 
 # Singletons — loaded once per process
 _chroma_client = None
@@ -178,7 +186,7 @@ def _get_claude():
     return _claude
 
 
-def _build_context_and_answer(combined: list, question: str) -> str:
+def _build_context_and_answer(combined: list, question: str, machine: str = None) -> str:
     """Shared context formatting and Claude call used by both retrieval paths."""
     combined = combined[:MAX_CONTEXT_CHUNKS]
     context_blocks = []
@@ -190,7 +198,20 @@ def _build_context_and_answer(combined: list, question: str) -> str:
         context_blocks.append(f"[{i}] Source: {ref}\n{prefix}{doc}")
 
     context_text = "\n\n---\n\n".join(context_blocks)
-    user_message = f"""RETRIEVED CONTEXT:
+
+    machine_header = ""
+    if machine:
+        platform = _MACHINE_PLATFORM.get(machine)
+        if platform:
+            machine_header = (
+                f"SELECTED MACHINE: {machine} (drive platform: {platform}). "
+                f"Answer for this machine and this drive platform only; if the "
+                f"question names a drive from the other platform, correct it first.\n\n"
+            )
+        else:
+            machine_header = f"SELECTED MACHINE: {machine}.\n\n"
+
+    user_message = f"""{machine_header}RETRIEVED CONTEXT:
 
 {context_text}
 
@@ -282,7 +303,7 @@ def _get_answer_pinecone(question: str, machine: str = None) -> str:
         except Exception:
             pass  # Don't fail the query if image lookup fails
 
-    return _build_context_and_answer(combined, question)
+    return _build_context_and_answer(combined, question, machine)
 
 
 def _chroma_machine_keep(meta: dict, machine: str, platform: str) -> bool:
@@ -370,7 +391,7 @@ def _get_answer_chroma(question: str, machine: str = None) -> str:
         except Exception:
             pass  # Don't fail the query if image lookup fails
 
-    return _build_context_and_answer(combined, question)
+    return _build_context_and_answer(combined, question, machine)
 
 
 def get_answer(question: str, machine: str = None) -> str:

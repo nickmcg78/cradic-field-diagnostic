@@ -1,19 +1,7 @@
 import { useState } from "react";
+import { CUSTOMERS } from "../customers";
 import "./ContextScreen.css";
 
-const CUSTOMERS = [
-  "Tassal DeCosti",
-  "Ausfresh",
-  "Lite n Easy",
-  "Bindaree Food Group",
-  "Baiada Hanwood",
-  "Baiada Beresfield",
-  "Hilton Foods",
-  "Coles",
-  "RROA",
-  "MQF",
-  "Huon Tasmania",
-];
 const MACHINES = [
   "Trave 340",
   "Trave 350",
@@ -24,38 +12,13 @@ const MACHINES = [
   "Trave 1400",
 ];
 
-function fuzzyMatch(input) {
-  if (!input.trim()) return null;
-  const words = input.toLowerCase().split(/\s+/);
-  for (const customer of CUSTOMERS) {
-    const customerWords = customer.toLowerCase().split(/\s+/);
-    if (words.some((w) => customerWords.some((cw) => cw.includes(w)))) {
-      return customer;
-    }
-  }
-  return null;
-}
-
 export default function ContextScreen({ onStart }) {
   const [machine, setMachine] = useState(null);
   const [customerInput, setCustomerInput] = useState("");
-  const [confirmedCustomer, setConfirmedCustomer] = useState(null);
-
-  const suggestion = confirmedCustomer ? null : fuzzyMatch(customerInput);
-
-  function handleCustomerChange(e) {
-    setCustomerInput(e.target.value);
-    setConfirmedCustomer(null);
-  }
-
-  function confirmSuggestion() {
-    setConfirmedCustomer(suggestion);
-    setCustomerInput(suggestion);
-  }
 
   function handleStart() {
     if (!machine) return;
-    const customer = confirmedCustomer || (customerInput.trim() || null);
+    const customer = customerInput.trim() || null;
     onStart({ machine, customer });
   }
 
@@ -86,20 +49,24 @@ export default function ContextScreen({ onStart }) {
         </section>
 
         <section className="ctx-section">
-          <h2 className="ctx-label">Customer name <span className="ctx-optional">(optional)</span></h2>
+          <h2 className="ctx-label">
+            Customer name <span className="ctx-optional">(optional)</span>
+          </h2>
           <div className="ctx-customer-wrap">
             <input
               className="ctx-customer-input"
               type="text"
-              placeholder="Type customer name..."
+              list="customer-list"
+              placeholder="Type or select a customer..."
               value={customerInput}
-              onChange={handleCustomerChange}
+              onChange={(e) => setCustomerInput(e.target.value)}
+              autoComplete="off"
             />
-            {suggestion && (
-              <button className="ctx-suggestion" onClick={confirmSuggestion}>
-                Did you mean: <strong>{suggestion}</strong>?
-              </button>
-            )}
+            <datalist id="customer-list">
+              {CUSTOMERS.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
           </div>
         </section>
 

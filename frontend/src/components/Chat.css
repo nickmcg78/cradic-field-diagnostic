@@ -214,3 +214,21 @@
 .session-notes-input::placeholder {
   color: #ffffff;
 }
+
+.chat-newsession-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #E8620A;
+  background: transparent;
+  border: 1px solid #E8620A;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.chat-newsession-btn:hover {
+  background: #E8620A;
+  color: #ffffff;
+}

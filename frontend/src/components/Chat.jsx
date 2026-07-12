@@ -11,7 +11,7 @@ function buildContextPrefix({ machine, customer }) {
   return `[Context: Machine = ${machine}] `;
 }
 
-export default function Chat({ authToken, sessionContext }) {
+export default function Chat({ authToken, sessionContext, onEndSession }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -89,8 +89,22 @@ export default function Chat({ authToken, sessionContext }) {
         <span className="chat-header-icon">⚙</span>
         <div>
           <h1 className="chat-header-title">Select Equip</h1>
-          <p className="chat-header-sub">powered by Cradic AI</p>
+          <p className="chat-header-sub">
+            {sessionContext?.machine
+              ? `${sessionContext.machine}${sessionContext.customer ? " · " + sessionContext.customer : ""}`
+              : "powered by Cradic AI"}
+          </p>
         </div>
+        {onEndSession && (
+          <button
+            type="button"
+            className="chat-newsession-btn"
+            onClick={onEndSession}
+            title="Start a new query on a different machine"
+          >
+            New machine
+          </button>
+        )}
       </header>
 
       <div className="chat-messages">

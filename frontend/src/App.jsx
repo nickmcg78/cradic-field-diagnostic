@@ -22,6 +22,10 @@ export default function App() {
     setSessionContext({ machine, customer });
   }
 
+  function handleEndSession() {
+    setSessionContext(null);
+  }
+
   if (!authToken) {
     return <Login onLogin={handleLogin} />;
   }
@@ -30,5 +34,11 @@ export default function App() {
     return <ContextScreen onStart={handleStart} />;
   }
 
-  return <Chat authToken={authToken} sessionContext={sessionContext} />;
+  return (
+    <Chat
+      authToken={authToken}
+      sessionContext={sessionContext}
+      onEndSession={handleEndSession}
+    />
+  );
 }
