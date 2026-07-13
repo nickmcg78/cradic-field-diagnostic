@@ -191,6 +191,59 @@
   cursor: not-allowed;
 }
 
+.session-notes-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.session-notes-send-btn {
+  padding: 0.35rem 0.75rem;
+  background: #E8620A;
+  color: #ffffff;
+  border: 1px solid #E8620A;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.session-notes-send-btn:hover:not(:disabled) {
+  background: #cf5509;
+}
+
+.session-notes-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.session-notes-name {
+  padding: 0.5rem 0.75rem;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #f0f0f0;
+  font-size: 0.9rem;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.session-notes-name:focus {
+  border-color: #E8620A;
+}
+
+.session-notes-name::placeholder {
+  color: #888888;
+}
+
+.session-notes-status {
+  font-size: 0.8rem;
+  color: #f0f0f0;
+  padding: 0.1rem 0.1rem 0;
+}
+
 .session-notes-input {
   padding: 0.75rem 1rem;
   background: #1a1a1a;

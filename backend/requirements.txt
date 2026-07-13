@@ -11,3 +11,5 @@ Pillow
 gunicorn
 cryptography
 pinecone
+requests
+psycopg[binary]

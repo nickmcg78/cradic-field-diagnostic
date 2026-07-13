@@ -18,7 +18,14 @@ export default function Chat({ authToken, sessionContext, onEndSession }) {
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
+  const [techName, setTechName] = useState(() => localStorage.getItem("tech_name") || "");
+  const [sendStatus, setSendStatus] = useState("");
+  const [sending, setSending] = useState(false);
   const bottomRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem("tech_name", techName);
+  }, [techName]);
 
   async function copyNotes() {
     if (!notes) return;
@@ -29,6 +36,46 @@ export default function Chat({ authToken, sessionContext, onEndSession }) {
       setCopyStatus("Copy failed");
     }
     setTimeout(() => setCopyStatus(""), 1500);
+  }
+
+  async function sendNote() {
+    if (!notes.trim() || sending) return;
+    if (!techName.trim()) {
+      setSendStatus("Enter your name first");
+      return;
+    }
+    setSending(true);
+    setSendStatus("Sending...");
+    try {
+      const res = await fetch(`${API_URL}/notes`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          tech_name: techName.trim(),
+          customer: sessionContext?.customer || null,
+          machine: sessionContext?.machine || null,
+          note_text: notes,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Not stored (e.g. 503 storage not configured) — keep the note.
+        setSendStatus(data.error || "Failed — copy your notes before leaving this page");
+      } else if (data.emailed) {
+        setSendStatus("Sent");
+        setNotes(""); // confirmed success — safe to clear
+      } else {
+        setSendStatus("Saved (email pending setup)");
+        setNotes(""); // stored in DB — safe to clear
+      }
+    } catch {
+      setSendStatus("Failed — copy your notes before leaving this page");
+    } finally {
+      setSending(false);
+    }
   }
 
   useEffect(() => {
@@ -61,14 +108,61 @@ export default function Chat({ authToken, sessionContext, onEndSession }) {
         }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.error || `Server error ${res.status}`);
+        let msg = `Server error ${res.status}`;
+        try {
+          const errData = await res.json();
+          msg = errData.error || msg;
+        } catch {
+          /* non-JSON error body */
+        }
+        throw new Error(msg);
       }
 
-      const aiMsg = { role: "ai", text: data.answer, timestamp: Date.now() };
-      setMessages((prev) => [...prev, aiMsg]);
+      const contentType = res.headers.get("content-type") || "";
+
+      if (contentType.includes("application/json") || !res.body) {
+        // Non-streaming path (STREAMING=0, or no streaming support).
+        const data = await res.json();
+        setMessages((prev) => [...prev, { role: "ai", text: data.answer, timestamp: Date.now() }]);
+      } else {
+        // Streaming path — render the accumulating buffer as tokens arrive.
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        const ts = Date.now();
+        let acc = "";
+        let started = false;
+
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          if (!chunk) continue;
+          acc += chunk;
+          if (!started) {
+            started = true;
+            setLoading(false); // first token in — drop the "checking..." indicator
+            setMessages((prev) => [...prev, { role: "ai", text: acc, timestamp: ts }]);
+          } else {
+            setMessages((prev) => {
+              const copy = prev.slice();
+              copy[copy.length - 1] = { ...copy[copy.length - 1], text: acc };
+              return copy;
+            });
+          }
+        }
+        acc += decoder.decode(); // flush any trailing bytes
+        if (started) {
+          setMessages((prev) => {
+            const copy = prev.slice();
+            copy[copy.length - 1] = { ...copy[copy.length - 1], text: acc };
+            return copy;
+          });
+        } else {
+          // Stream produced nothing — still show a (possibly empty) message.
+          setMessages((prev) => [...prev, { role: "ai", text: acc, timestamp: ts }]);
+        }
+      }
     } catch (err) {
       setError(err.message || "Failed to get a response. Check connection.");
     } finally {
@@ -150,14 +244,33 @@ export default function Chat({ authToken, sessionContext, onEndSession }) {
           <label htmlFor="session-notes-input" className="session-notes-label">
             Session Notes
           </label>
-          <button
-            className="session-notes-copy-btn"
-            onClick={copyNotes}
-            disabled={!notes}
-          >
-            {copyStatus || "Copy Notes"}
-          </button>
+          <div className="session-notes-actions">
+            <button
+              className="session-notes-copy-btn"
+              onClick={copyNotes}
+              disabled={!notes}
+            >
+              {copyStatus || "Copy Notes"}
+            </button>
+            <button
+              className="session-notes-send-btn"
+              onClick={sendNote}
+              disabled={!notes.trim() || sending}
+              title="Store the note and email it to the technical manager"
+            >
+              {sending ? "Sending..." : "Send to manager"}
+            </button>
+          </div>
         </div>
+        <input
+          id="session-notes-name"
+          className="session-notes-name"
+          type="text"
+          placeholder="Your name (for the manager)"
+          value={techName}
+          onChange={(e) => setTechName(e.target.value)}
+          autoComplete="name"
+        />
         <textarea
           id="session-notes-input"
           className="session-notes-input"
@@ -166,6 +279,7 @@ export default function Chat({ authToken, sessionContext, onEndSession }) {
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
         />
+        {sendStatus && <div className="session-notes-status">{sendStatus}</div>}
       </div>
     </div>
   );
