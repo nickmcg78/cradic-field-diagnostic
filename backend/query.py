@@ -22,7 +22,8 @@ CHROMA_PERSIST_PATH = os.environ.get("CHROMA_PERSIST_PATH", _DEFAULT_CHROMA_PATH
 COLLECTION_NAME = "select_equip_kb"
 PINECONE_INDEX_NAME = "cradic-field-diagnostic"
 TOP_K = 15
-MAX_CONTEXT_CHUNKS = 20
+# Overridable via env (default 20 — do NOT change the default; A/B tuning is later).
+MAX_CONTEXT_CHUNKS = int(os.environ.get("MAX_CONTEXT_CHUNKS", "20"))
 MAX_IMAGES_PER_FILE = 5
 _LOGO_FILTERS = ["uptimeequip", "selectequip logo", "logo and tagline"]
 
@@ -186,8 +187,9 @@ def _get_claude():
     return _claude
 
 
-def _build_context_and_answer(combined: list, question: str, machine: str = None) -> str:
-    """Shared context formatting and Claude call used by both retrieval paths."""
+def _format_user_message(combined: list, question: str, machine: str = None) -> str:
+    """Build the user-message string (context + machine header + question).
+    Shared by the streaming and non-streaming answer paths."""
     combined = combined[:MAX_CONTEXT_CHUNKS]
     context_blocks = []
     for i, (chunk_id, doc, meta) in enumerate(combined, start=1):
@@ -211,7 +213,7 @@ def _build_context_and_answer(combined: list, question: str, machine: str = None
         else:
             machine_header = f"SELECTED MACHINE: {machine}.\n\n"
 
-    user_message = f"""{machine_header}RETRIEVED CONTEXT:
+    return f"""{machine_header}RETRIEVED CONTEXT:
 
 {context_text}
 
@@ -219,6 +221,10 @@ def _build_context_and_answer(combined: list, question: str, machine: str = None
 
 TECHNICIAN QUESTION: {question}"""
 
+
+def _build_context_and_answer(combined: list, question: str, machine: str = None) -> str:
+    """Non-streaming Claude call — returns the full answer text."""
+    user_message = _format_user_message(combined, question, machine)
     claude = _get_claude()
     message = claude.messages.create(
         model=ANSWER_MODEL,
@@ -229,7 +235,25 @@ TECHNICIAN QUESTION: {question}"""
     return message.content[0].text
 
 
-def _get_answer_pinecone(question: str, machine: str = None) -> str:
+def _stream_context_and_answer(combined: list, question: str, machine: str = None):
+    """Streaming Claude call — yields answer text incrementally."""
+    user_message = _format_user_message(combined, question, machine)
+    claude = _get_claude()
+    with claude.messages.stream(
+        model=ANSWER_MODEL,
+        max_tokens=2048,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_message}],
+    ) as stream:
+        for text in stream.text_stream:
+            yield text
+
+
+def _retrieve_pinecone(question: str, machine: str = None):
+    """Retrieve and assemble context from Pinecone.
+    Returns (combined, early_message): exactly one is meaningful — if
+    early_message is not None it is the whole response; otherwise combined is
+    the context list to feed the model."""
     index = _get_pinecone_index()
     ef = _get_ef()
 
@@ -263,7 +287,7 @@ def _get_answer_pinecone(question: str, machine: str = None) -> str:
     # If a machine is selected but nothing machine-specific came back, say so
     # plainly rather than answer from unfiltered (other-machine) sources.
     if machine and not _has_machine_specific(combined):
-        return _no_machine_results_message(machine)
+        return None, _no_machine_results_message(machine)
 
     # Secondary retrieval — image_description chunks from the same source files
     # (already machine-scoped, since source_files come from scoped primary hits)
@@ -303,7 +327,7 @@ def _get_answer_pinecone(question: str, machine: str = None) -> str:
         except Exception:
             pass  # Don't fail the query if image lookup fails
 
-    return _build_context_and_answer(combined, question, machine)
+    return combined, None
 
 
 def _chroma_machine_keep(meta: dict, machine: str, platform: str) -> bool:
@@ -324,7 +348,9 @@ def _chroma_machine_keep(meta: dict, machine: str, platform: str) -> bool:
     return False
 
 
-def _get_answer_chroma(question: str, machine: str = None) -> str:
+def _retrieve_chroma(question: str, machine: str = None):
+    """Retrieve and assemble context from ChromaDB (local fallback).
+    Returns (combined, early_message) — see _retrieve_pinecone."""
     collection = _get_chroma_collection()
 
     # Pull a wider set when scoping so the post-filter still yields ~TOP_K.
@@ -344,7 +370,7 @@ def _get_answer_chroma(question: str, machine: str = None) -> str:
         platform = _MACHINE_PLATFORM.get(machine)
         rows = [r for r in rows if _chroma_machine_keep(r[2], machine, platform)][:TOP_K]
         if not _has_machine_specific(rows):
-            return _no_machine_results_message(machine)
+            return None, _no_machine_results_message(machine)
         ids = [r[0] for r in rows]
 
     seen_ids = set(ids)
@@ -391,13 +417,35 @@ def _get_answer_chroma(question: str, machine: str = None) -> str:
         except Exception:
             pass  # Don't fail the query if image lookup fails
 
-    return _build_context_and_answer(combined, question, machine)
+    return combined, None
+
+
+def _retrieve(question: str, machine: str = None):
+    """Route retrieval to Pinecone (production) or ChromaDB (local fallback).
+    Returns (combined, early_message)."""
+    if os.environ.get("PINECONE_API_KEY"):
+        return _retrieve_pinecone(question, machine)
+    return _retrieve_chroma(question, machine)
 
 
 def get_answer(question: str, machine: str = None) -> str:
     """Route to Pinecone if PINECONE_API_KEY is set, otherwise fall back to ChromaDB.
     When `machine` is set, retrieval is strictly scoped to that machine
     (manuals + its service reports + its drive-platform docs + KB context)."""
-    if os.environ.get("PINECONE_API_KEY"):
-        return _get_answer_pinecone(question, machine)
-    return _get_answer_chroma(question, machine)
+    combined, early_message = _retrieve(question, machine)
+    if early_message is not None:
+        return early_message
+    return _build_context_and_answer(combined, question, machine)
+
+
+def get_answer_stream(question: str, machine: str = None):
+    """Streaming variant of get_answer — a generator yielding answer text.
+
+    Retrieval runs synchronously before the first yield, so any retrieval
+    error surfaces when the generator is first advanced (letting the caller
+    return a proper HTTP error status before the streamed body begins)."""
+    combined, early_message = _retrieve(question, machine)
+    if early_message is not None:
+        yield early_message
+        return
+    yield from _stream_context_and_answer(combined, question, machine)

@@ -1,0 +1,15 @@
+name: Keep backend warm
+
+# Pings the Render backend so it doesn't cold-start between technician queries.
+# GitHub Actions cron is best-effort (can lag under load) — good enough here.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Curl health endpoint
+        run: curl -fsS https://cradic-field-diagnostic-api.onrender.com/health
